@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -6,6 +7,8 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/user/user.service';
 import { LoginUserDto } from './dto/login-user.dto';
+import * as bcrypt from 'bcrypt';
+import { User } from 'src/share/models/user.model';
 
 @Injectable()
 export class AuthService {
@@ -15,18 +18,21 @@ export class AuthService {
   ) {}
 
   async validateUser(dto: LoginUserDto) {
-    try {
-      const user = await this.userService.getById(dto.userId);
+    let user: User;
 
-      return user;
+    try {
+      user = await this.userService.getById(dto.userId);
     } catch (error) {
-      if (error instanceof InternalServerErrorException) {
-        throw new UnauthorizedException('Username or password is incorrect');
-      } else {
-        console.log(error);
-        throw error;
-      }
+      throw new ForbiddenException('ユーザーIDまたはパスワードが異なります。');
     }
+
+    const isValid = await bcrypt.compare(dto.password, user.hashedPassword);
+
+    if (!isValid) {
+      throw new ForbiddenException('ユーザーIDまたはパスワードが異なります。');
+    }
+
+    return user;
   }
 
   async login(dto: LoginUserDto) {

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 
 import * as bcrypt from 'bcrypt';
@@ -33,6 +37,7 @@ export class UserService {
         Email: { S: dto.email },
         ProfileImage: { S: dto.profileImg },
       },
+      ConditionExpression: 'attribute_not_exists(PK)',
     };
 
     try {
@@ -42,12 +47,17 @@ export class UserService {
         message: 'User created successfully',
       };
     } catch (error) {
-      console.log(error);
-      throw error;
+      if (error instanceof ConditionalCheckFailedException) {
+        throw new BadRequestException(
+          'このユーザーIDはすでに使用されています。',
+        );
+      } else {
+        throw new InternalServerErrorException();
+      }
     }
   }
 
-  async getById(userId: string): Promise<Omit<User, 'hashedPassword'>> {
+  async getById(userId: string): Promise<User> {
     const params: GetItemCommandInput = {
       TableName: this.tableName,
       Key: {
